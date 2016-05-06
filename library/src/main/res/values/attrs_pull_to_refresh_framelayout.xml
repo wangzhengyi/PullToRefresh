@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="PtrFrameLayout">
+        <!-- 下拉时的阻尼系数 -->
+        <attr name="resistance" format="float" />
+        <!-- 触发刷新时的移动位置比例 -->
+        <attr name="ratio_of_header_height_to_refresh" format="float" />
+        <!-- 回弹延迟,回弹到刷新高度所用的时间 -->
+        <attr name="duration_to_close" format="integer" />
+        <!-- 头部回弹时间 -->
+        <attr name="duration_to_close_header" format="integer" />
+        <!-- 刷新是否保持头部 -->
+        <attr name="pull_to_fresh" format="boolean" />
+        <!-- 是否为释放刷新 -->
+        <attr name="keep_header_when_refresh" format="boolean" />
+    </declare-styleable>
+
+</resources>
