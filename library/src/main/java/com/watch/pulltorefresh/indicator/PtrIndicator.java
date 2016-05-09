@@ -36,10 +36,16 @@ public class PtrIndicator {
     private int mOffsetToKeepHeaderWhileLoading = -1;
     private int mRefreshCompleteY = 0;
 
+    /**
+     * 获取阻尼系数.
+     */
     public float getResistance() {
         return mResistance;
     }
 
+    /**
+     * 设置阻尼系数.
+     */
     public void setResistance(float resistance) {
         mResistance = resistance;
     }

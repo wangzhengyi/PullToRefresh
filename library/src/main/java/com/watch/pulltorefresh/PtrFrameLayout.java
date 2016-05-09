@@ -38,14 +38,18 @@ public class PtrFrameLayout extends ViewGroup {
     private int mDurationToCloseHeader = 1000;
 
     /**
-     * 释放刷新还是下拉刷新.(true: 释放刷新;false: 下拉刷新)
+     * 下拉刷新是否保持Header View的显示.
      */
     private boolean mKeepHeaderWhenRefresh = true;
 
     /**
-     * 刷新时是否保持头部.
+     * 释放刷新还是下拉刷新.(true: 释放刷新;false: 下拉刷新)
      */
     private boolean mPullToRefresh = false;
+
+    /**
+     * 下拉刷新的Header View.
+     */
     private View mHeaderView;
     private PtrUIHandlerHolder mPtrUIHandlerHolder = PtrUIHandlerHolder.create();
     private PtrHandler mPtrHandler;
@@ -151,6 +155,26 @@ public class PtrFrameLayout extends ViewGroup {
         if (mPerformRefreshCompleteDelay != null) {
             removeCallbacks(mPerformRefreshCompleteDelay);
         }
+    }
+
+    @Override
+    protected boolean checkLayoutParams(ViewGroup.LayoutParams p) {
+        return p != null && p instanceof MarginLayoutParams;
+    }
+
+    @Override
+    protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+        return new MarginLayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+    }
+
+    @Override
+    protected ViewGroup.LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
+        return new MarginLayoutParams(p);
+    }
+
+    @Override
+    public ViewGroup.LayoutParams generateLayoutParams(AttributeSet attrs) {
+        return new MarginLayoutParams(getContext(), attrs);
     }
 
     @Override
@@ -281,8 +305,8 @@ public class PtrFrameLayout extends ViewGroup {
                         && Math.abs(offsetX) > mPagingTouchSlop
                         && Math.abs(offsetX) > Math.abs(offsetY)
                         && mPtrIndicator.isInStartPosition()) {
-                        // 不阻止横向移动,且判定为横向移动,并且HeaderView没有发生位移,则将Move事件交给父类处理.
-                        mPreventForHorizontal = true;
+                    // 不阻止横向移动,且判定为横向移动,并且HeaderView没有发生位移,则将Move事件交给父类处理.
+                    mPreventForHorizontal = true;
                 }
                 if (mPreventForHorizontal) {
                     return dispatchTouchEventSupper(e);
@@ -320,18 +344,20 @@ public class PtrFrameLayout extends ViewGroup {
         int to = mPtrIndicator.getCurrentPos() + (int) deltaY;
         // 向上移动的最大值就是Header View全部隐藏
         if (mPtrIndicator.willOverTop(to)) {
-            L.e("over top");
             to = PtrIndicator.POS_START;
         }
 
         mPtrIndicator.setCurrentPos(to);
         // 计算移动偏移量
-        int change = to - mPtrIndicator.getLastPos();
-        updatePos(change);
+        int posOffset = to - mPtrIndicator.getLastPos();
+        updatePos(posOffset);
     }
 
-    private void updatePos(int change) {
-        if (change == 0) {
+    /**
+     * 根据移动偏移更新下拉刷新状态
+     */
+    private void updatePos(int posOffset) {
+        if (posOffset == 0) {
             return;
         }
 
@@ -342,7 +368,6 @@ public class PtrFrameLayout extends ViewGroup {
             mHasSendCancelEvent = true;
             sendCancelEvent();
         }
-
 
         if ((mPtrIndicator.hasJustLeftStartPosition() && mStatus == PTR_STATUS_INIT) ||
                 (mPtrIndicator.goDownCrossFinishPosition()
@@ -372,26 +397,24 @@ public class PtrFrameLayout extends ViewGroup {
             // 如果达到刷新高度且mPullToRefresh=true,则立刻刷新
             if (isUnderTouch && !isAutoRefresh() && mPullToRefresh
                     && mPtrIndicator.crossRefreshLineFromTopToBottom()) {
-                L.e("开始刷新1");
                 tryToPerformRefresh();
             }
 
             // reach header height while auto refresh
             if (performAutoRefreshButLater()
                     && mPtrIndicator.hasJustReachedHeaderHeightFromTopToBottom()) {
-                L.e("开始刷新2");
                 tryToPerformRefresh();
             }
         }
 
         if (DEBUG) {
             L.v("updatePos: change: %s, current: %s last: %s, top: %s, headerHeight: %s",
-                    change, mPtrIndicator.getCurrentPos(), mPtrIndicator.getLastPos(), mContentView.getTop(), mHeaderHeight);
+                    posOffset, mPtrIndicator.getCurrentPos(), mPtrIndicator.getLastPos(), mContentView.getTop(), mHeaderHeight);
         }
 
-        mHeaderView.offsetTopAndBottom(change);
+        mHeaderView.offsetTopAndBottom(posOffset);
         if (!isPinContent()) {
-            mContentView.offsetTopAndBottom(change);
+            mContentView.offsetTopAndBottom(posOffset);
         }
         invalidate();
 
@@ -400,9 +423,37 @@ public class PtrFrameLayout extends ViewGroup {
         }
     }
 
-    @SuppressWarnings("unused")
-    public int getHeaderHeight() {
-        return mHeaderHeight;
+
+    /**
+     * 向父类发送ACTION_CANCEL事件
+     */
+    private void sendCancelEvent() {
+        if (DEBUG) {
+            L.d("send cancel event");
+        }
+        // The ScrollChecker will update position and lead to send cancel event when mLastMoveEvent is null.
+        // fix #104, #80, #92
+        if (mLastMoveEvent == null) {
+            return;
+        }
+        MotionEvent last = mLastMoveEvent;
+        MotionEvent e = MotionEvent.obtain(last.getDownTime(),
+                last.getEventTime() + ViewConfiguration.getLongPressTimeout(),
+                MotionEvent.ACTION_CANCEL, last.getX(), last.getY(), last.getMetaState());
+        dispatchTouchEventSupper(e);
+    }
+
+    /**
+     * 向父类发送ACTION_DOWN事件
+     */
+    private void sendDownEvent() {
+        if (DEBUG) {
+            L.d("send down event");
+        }
+        final MotionEvent last = mLastMoveEvent;
+        MotionEvent e = MotionEvent.obtain(last.getDownTime(), last.getEventTime(),
+                MotionEvent.ACTION_DOWN, last.getX(), last.getY(), last.getMetaState());
+        dispatchTouchEventSupper(e);
     }
 
     private void onRelease(boolean stayForLoading) {
@@ -682,6 +733,23 @@ public class PtrFrameLayout extends ViewGroup {
         return (mFlag & FLAG_ENABLE_NEXT_PTR_AT_ONCE) > 0;
     }
 
+
+    /**
+     * 在PtrFrameLayout上添加Header View.
+     */
+    public void setHeaderView(View header) {
+        if (mHeaderView != null && header != null && mHeaderView != header) {
+            removeView(mHeaderView);
+        }
+        ViewGroup.LayoutParams lp = header.getLayoutParams();
+        if (lp == null) {
+            lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            header.setLayoutParams(lp);
+        }
+        mHeaderView = header;
+        addView(header);
+    }
+
     /**
      * If @param enable has been set to true. The user can perform next PTR at once.
      *
@@ -695,14 +763,17 @@ public class PtrFrameLayout extends ViewGroup {
         }
     }
 
+    /**
+     * 下拉刷新的Content View是否跟随下拉移动.
+     */
     public boolean isPinContent() {
         return (mFlag & FLAG_PIN_CONTENT) > 0;
     }
 
     /**
-     * The content view will now move when {@param pinContent} set to true.
+     * 设置Content View是否跟随手势移动.
      *
-     * @param pinContent
+     * @param pinContent true:不跟随 false:跟随
      */
     public void setPinContent(boolean pinContent) {
         if (pinContent) {
@@ -713,50 +784,23 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     /**
-     * It's useful when working with viewpager.
-     *
-     * @param disable
+     * 设置是否禁止横向移动.
+     * @param disable true:禁止横向移动; false:允许横向移动
      */
     public void disableWhenHorizontalMove(boolean disable) {
         mDisableWhenHorizontalMove = disable;
     }
 
     /**
-     * loading will last at least for so long
-     *
-     * @param time
+     * 设置数据加载的最小时间.
      */
     public void setLoadingMinTime(int time) {
         mLoadingMinTime = time;
     }
 
     /**
-     * Not necessary any longer. Once moved, cancel event will be sent to child.
-     *
-     * @param yes
+     * 设置PtrIndicator.
      */
-    @Deprecated
-    public void setInterceptEventWhileWorking(boolean yes) {
-    }
-
-    @SuppressWarnings({"unused"})
-    public View getContentView() {
-        return mContentView;
-    }
-
-    public void setPtrHandler(PtrHandler ptrHandler) {
-        mPtrHandler = ptrHandler;
-    }
-
-    public void addPtrUIHandler(PtrUIHandler ptrUIHandler) {
-        PtrUIHandlerHolder.addHandler(mPtrUIHandlerHolder, ptrUIHandler);
-    }
-
-    @SuppressWarnings({"unused"})
-    public void removePtrUIHandler(PtrUIHandler ptrUIHandler) {
-        mPtrUIHandlerHolder = PtrUIHandlerHolder.removeHandler(mPtrUIHandlerHolder, ptrUIHandler);
-    }
-
     public void setPtrIndicator(PtrIndicator slider) {
         if (mPtrIndicator != null && mPtrIndicator != slider) {
             slider.convertFrom(mPtrIndicator);
@@ -764,167 +808,154 @@ public class PtrFrameLayout extends ViewGroup {
         mPtrIndicator = slider;
     }
 
-    @SuppressWarnings({"unused"})
-    public float getResistance() {
-        return mPtrIndicator.getResistance();
-    }
-
-    public void setResistance(float resistance) {
-        mPtrIndicator.setResistance(resistance);
-    }
-
-    @SuppressWarnings({"unused"})
-    public float getDurationToClose() {
-        return mDurationToClose;
+    /**
+     * 获取Header View的高度.
+     */
+    public int getHeaderHeight() {
+        return mHeaderHeight;
     }
 
     /**
-     * The duration to return back to the refresh position
-     *
-     * @param duration
+     * 获取Header View对象.
      */
-    public void setDurationToClose(int duration) {
-        mDurationToClose = duration;
+    public View getHeaderView() {
+        return mHeaderView;
     }
 
-    @SuppressWarnings({"unused"})
+    /**
+     * 获取下拉刷新的高度.
+     */
+    public int getOffsetToRefresh() {
+        return mPtrIndicator.getOffsetToRefresh();
+    }
+
+    /**
+     * 设置下拉刷新的高度.
+     */
+    public void setOffsetToRefresh(int offset) {
+        mPtrIndicator.setOffsetToRefresh(offset);
+    }
+
+    /**
+     * 获取下拉刷新的阻尼系数.
+     */
+    public float getRatioOfHeaderToHeightRefresh() {
+        return mPtrIndicator.getRatioOfHeaderHeightToRefresh();
+    }
+
+    /**
+     * 设置下拉刷新的阻尼系数.
+     */
+    public void setRatioOfHeaderHeightToRefresh(float ratio) {
+        mPtrIndicator.setRatioOfHeaderHeightToRefresh(ratio);
+    }
+
+    /**
+     * 返回刷新方式.
+     * @return true:释放刷新 false:下拉刷新
+     */
+    public boolean isPullToRefresh() {
+        return mPullToRefresh;
+    }
+
+    /**
+     * 设置是否达到下拉刷新高度立刻刷新
+     * @param pullToRefresh true:下拉直接刷新 false:释放刷新
+     */
+    public void setPullToRefresh(boolean pullToRefresh) {
+        mPullToRefresh = pullToRefresh;
+    }
+
+    /**
+     * 判定下拉刷新是否保持Header View显示.
+     */
+    public boolean isKeepHeaderWhenRefresh() {
+        return mKeepHeaderWhenRefresh;
+    }
+
+    /**
+     * 设定下拉刷新时是否显示Header View
+     * @param keepOrNot true:显示; false:不显示.
+     */
+    public void setKeepHeaderWhenRefresh(boolean keepOrNot) {
+        mKeepHeaderWhenRefresh = keepOrNot;
+    }
+
+    /**
+     * 获取Header View的回弹延迟时间.
+     */
     public long getDurationToCloseHeader() {
         return mDurationToCloseHeader;
     }
 
     /**
-     * The duration to close time
-     *
-     * @param duration
+     * 设置Header View的回弹延迟时间.
      */
     public void setDurationToCloseHeader(int duration) {
         mDurationToCloseHeader = duration;
     }
 
-    public void setRatioOfHeaderHeightToRefresh(float ratio) {
-        mPtrIndicator.setRatioOfHeaderHeightToRefresh(ratio);
+    /**
+     * 获取回弹到刷新高度的延迟时间.
+     */
+    public float getDurationToClose() {
+        return mDurationToClose;
     }
 
-    public int getOffsetToRefresh() {
-        return mPtrIndicator.getOffsetToRefresh();
+    /**
+     * 设置回弹到刷新高度的延迟时间.
+     */
+    public void setDurationToClose(int duration) {
+        mDurationToClose = duration;
     }
 
-    @SuppressWarnings({"unused"})
-    public void setOffsetToRefresh(int offset) {
-        mPtrIndicator.setOffsetToRefresh(offset);
+    /**
+     * 获取阻尼系数.
+     */
+    public float getResistance() {
+        return mPtrIndicator.getResistance();
     }
 
-    @SuppressWarnings({"unused"})
-    public float getRatioOfHeaderToHeightRefresh() {
-        return mPtrIndicator.getRatioOfHeaderHeightToRefresh();
+    /**
+     * 设置阻尼系数.
+     */
+    public void setResistance(float resistance) {
+        mPtrIndicator.setResistance(resistance);
     }
 
-    @SuppressWarnings({"unused"})
+    /**
+     * 设置下拉刷新功能实现类.
+     */
+    public void setPtrHandler(PtrHandler ptrHandler) {
+        mPtrHandler = ptrHandler;
+    }
+
+    /**
+     * 添加下拉刷新Header View显示类.
+     */
+    public void addPtrUIHandler(PtrUIHandler ptrUIHandler) {
+        PtrUIHandlerHolder.addHandler(mPtrUIHandlerHolder, ptrUIHandler);
+    }
+
+    /**
+     * 删除指定的下拉刷新头部.
+     */
+    public void removePtrUIHandler(PtrUIHandler ptrUIHandler) {
+        mPtrUIHandlerHolder = PtrUIHandlerHolder.removeHandler(mPtrUIHandlerHolder, ptrUIHandler);
+    }
+
+    /**
+     * 获取下拉刷新时Header View的显示高度.
+     */
     public int getOffsetToKeepHeaderWhileLoading() {
         return mPtrIndicator.getOffsetToKeepHeaderWhileLoading();
     }
 
-    @SuppressWarnings({"unused"})
+    /**
+     * 设置下拉刷新时Header View的显示高度.
+     */
     public void setOffsetToKeepHeaderWhileLoading(int offset) {
         mPtrIndicator.setOffsetToKeepHeaderWhileLoading(offset);
-    }
-
-    @SuppressWarnings({"unused"})
-    public boolean isKeepHeaderWhenRefresh() {
-        return mKeepHeaderWhenRefresh;
-    }
-
-    public void setKeepHeaderWhenRefresh(boolean keepOrNot) {
-        mKeepHeaderWhenRefresh = keepOrNot;
-    }
-
-    public boolean isPullToRefresh() {
-        return mPullToRefresh;
-    }
-
-    public void setPullToRefresh(boolean pullToRefresh) {
-        mPullToRefresh = pullToRefresh;
-    }
-
-    @SuppressWarnings({"unused"})
-    public View getHeaderView() {
-        return mHeaderView;
-    }
-
-    public void setHeaderView(View header) {
-        if (mHeaderView != null && header != null && mHeaderView != header) {
-            removeView(mHeaderView);
-        }
-        ViewGroup.LayoutParams lp = header.getLayoutParams();
-        if (lp == null) {
-            lp = new LayoutParams(-1, -2);
-            header.setLayoutParams(lp);
-        }
-        mHeaderView = header;
-        addView(header);
-    }
-
-    @Override
-    protected boolean checkLayoutParams(ViewGroup.LayoutParams p) {
-        return p != null && p instanceof LayoutParams;
-    }
-
-    @Override
-    protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
-        return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-    }
-
-    @Override
-    protected ViewGroup.LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
-        return new LayoutParams(p);
-    }
-
-    @Override
-    public ViewGroup.LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new LayoutParams(getContext(), attrs);
-    }
-
-    private void sendCancelEvent() {
-        if (DEBUG) {
-            L.d("send cancel event");
-        }
-        // The ScrollChecker will update position and lead to send cancel event when mLastMoveEvent is null.
-        // fix #104, #80, #92
-        if (mLastMoveEvent == null) {
-            return;
-        }
-        MotionEvent last = mLastMoveEvent;
-        MotionEvent e = MotionEvent.obtain(last.getDownTime(), last.getEventTime() + ViewConfiguration.getLongPressTimeout(), MotionEvent.ACTION_CANCEL, last.getX(), last.getY(), last.getMetaState());
-        dispatchTouchEventSupper(e);
-    }
-
-    private void sendDownEvent() {
-        if (DEBUG) {
-            L.d("send down event");
-        }
-        final MotionEvent last = mLastMoveEvent;
-        MotionEvent e = MotionEvent.obtain(last.getDownTime(), last.getEventTime(), MotionEvent.ACTION_DOWN, last.getX(), last.getY(), last.getMetaState());
-        dispatchTouchEventSupper(e);
-    }
-
-    public static class LayoutParams extends MarginLayoutParams {
-
-        public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
-        }
-
-        public LayoutParams(int width, int height) {
-            super(width, height);
-        }
-
-        @SuppressWarnings({"unused"})
-        public LayoutParams(MarginLayoutParams source) {
-            super(source);
-        }
-
-        public LayoutParams(ViewGroup.LayoutParams source) {
-            super(source);
-        }
     }
 
     /**

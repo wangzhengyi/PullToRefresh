@@ -17,6 +17,13 @@ public interface PtrUIHandler {
 
     void onUIRefreshComplete(PtrFrameLayout frame);
 
+    /**
+     * 下拉过程中的位置变化回调
+     * @param frame 下拉刷新ViewGroup
+     * @param isUnderTouch PtrFrameLayout是否处于按下状态
+     * @param status 刷新状态
+     * @param ptrIndicator 刷新指示器
+     */
     void onUIPositionChange(PtrFrameLayout frame, boolean isUnderTouch, byte status,
                             PtrIndicator ptrIndicator);
 }
