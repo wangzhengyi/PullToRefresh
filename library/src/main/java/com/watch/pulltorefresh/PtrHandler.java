@@ -7,7 +7,7 @@ import android.view.View;
  */
 public interface PtrHandler {
     /**
-     * 判断是否可以下拉刷新
+     * 判断当前View是否能刷新，UI层面的控制.(例如:ListView和ScrollView是否处于顶部)
      */
     boolean checkCanDoRefresh(final PtrFrameLayout frame, final View content, final View header);
 

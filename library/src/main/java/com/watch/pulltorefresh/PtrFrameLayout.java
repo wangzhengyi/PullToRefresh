@@ -33,9 +33,16 @@ public class PtrFrameLayout extends ViewGroup {
      */
     protected View mContentView;
     private byte mStatus = PTR_STATUS_INIT;
-    // config
+
+    /**
+     * 回弹到刷新高度的延迟时间.
+     */
     private int mDurationToClose = 200;
-    private int mDurationToCloseHeader = 1000;
+
+    /**
+     * 刷新完成后,Header View的回弹时间.
+     */
+    private int mDurationToCloseHeader = 10000;
 
     /**
      * 下拉刷新是否保持Header View的显示.
@@ -57,16 +64,24 @@ public class PtrFrameLayout extends ViewGroup {
     private ScrollChecker mScrollChecker;
 
     /**
-     * 移动的最小距离.
+     * 横向移动的最小距离.
      */
     private int mPagingTouchSlop;
     private int mHeaderHeight;
+    /**
+     * 默认禁止横向移动.
+     */
     private boolean mDisableWhenHorizontalMove = false;
     private int mFlag = 0x00;
 
-    // disable when detect moving horizontally
-    private boolean mPreventForHorizontal = false;
+    /**
+     * 是否判定当前MotionEvent为横向移动.
+     */
+    private boolean mPermitForHorizontal = false;
 
+    /**
+     * 记录之前一个MotionEvent事件.
+     */
     private MotionEvent mLastMoveEvent;
 
     private PtrUIHandlerHook mRefreshCompleteHook;
@@ -105,8 +120,10 @@ public class PtrFrameLayout extends ViewGroup {
             mPtrIndicator.setResistance(ta.getFloat(R.styleable.PtrFrameLayout_resistance,
                     mPtrIndicator.getResistance()));
 
-            mDurationToClose = ta.getInt(R.styleable.PtrFrameLayout_duration_to_close, mDurationToClose);
-            mDurationToCloseHeader = ta.getInt(R.styleable.PtrFrameLayout_duration_to_close_header, mDurationToCloseHeader);
+            mDurationToClose = ta.getInt(R.styleable.PtrFrameLayout_duration_to_close,
+                    mDurationToClose);
+            mDurationToCloseHeader = ta.getInt(R.styleable.PtrFrameLayout_duration_to_close_header,
+                    mDurationToCloseHeader);
 
 
             float ratio = ta.getFloat(R.styleable.PtrFrameLayout_ratio_of_header_height_to_refresh,
@@ -140,6 +157,7 @@ public class PtrFrameLayout extends ViewGroup {
         }
 
         if (mHeaderView != null) {
+            // TODO:作用
             mHeaderView.bringToFront();
         }
         super.onFinishInflate();
@@ -228,7 +246,7 @@ public class PtrFrameLayout extends ViewGroup {
             MarginLayoutParams lp = (MarginLayoutParams) mHeaderView.getLayoutParams();
             final int left = paddingLeft + lp.leftMargin;
             // 初始向上偏移mHeaderHeight,隐藏HeaderView.
-            final int top = paddingTop + lp.topMargin + offsetY - mHeaderHeight;
+            final int top = -(mHeaderHeight - paddingTop - lp.topMargin - offsetY);
             final int right = left + mHeaderView.getMeasuredWidth();
             final int bottom = top + mHeaderView.getMeasuredHeight();
             mHeaderView.layout(left, top, right, bottom);
@@ -273,7 +291,7 @@ public class PtrFrameLayout extends ViewGroup {
 
                 mScrollChecker.abortIfWorking();
 
-                mPreventForHorizontal = false;
+                mPermitForHorizontal = false;
                 dispatchTouchEventSupper(e);
                 return true;
 
@@ -301,14 +319,16 @@ public class PtrFrameLayout extends ViewGroup {
                 float offsetY = mPtrIndicator.getOffsetY();
 
                 if (mDisableWhenHorizontalMove
-                        && !mPreventForHorizontal
+                        && !mPermitForHorizontal
                         && Math.abs(offsetX) > mPagingTouchSlop
                         && Math.abs(offsetX) > Math.abs(offsetY)
                         && mPtrIndicator.isInStartPosition()) {
                     // 不阻止横向移动,且判定为横向移动,并且HeaderView没有发生位移,则将Move事件交给父类处理.
-                    mPreventForHorizontal = true;
+                    mPermitForHorizontal = true;
                 }
-                if (mPreventForHorizontal) {
+
+                if (mPermitForHorizontal) {
+                    // 判定为横向移动,则交给父类处理.
                     return dispatchTouchEventSupper(e);
                 }
 
@@ -316,7 +336,7 @@ public class PtrFrameLayout extends ViewGroup {
                 boolean moveUp = !moveDown;
                 boolean canMoveUp = mPtrIndicator.hasLeftStartPosition();
 
-                // 如果是下拉事件,PtrHandler禁止下拉刷新,则将Move事件将给父类处理.
+                // 如果是下拉事件,但是子控件可以向下滑动,则将Move事件将给父类处理.
                 if (moveDown && mPtrHandler != null
                         && !mPtrHandler.checkCanDoRefresh(this, mContentView, mHeaderView)) {
                     return dispatchTouchEventSupper(e);
@@ -332,8 +352,9 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     /**
-     * deltaY > 0, 向下移动.
-     * deltaY < 0, 向上移动.
+     * 处理下拉或上滑事件.
+     *
+     * @param deltaY 距离上次move事件的y轴偏.e.g.deltaY > 0, 向下移动; deltaY < 0, 向上移动.
      */
     private void movePos(float deltaY) {
         if ((deltaY < 0 && mPtrIndicator.isInStartPosition())) {
@@ -341,6 +362,7 @@ public class PtrFrameLayout extends ViewGroup {
             return;
         }
 
+        // 当前HeaderView的y轴绝对位置
         int to = mPtrIndicator.getCurrentPos() + (int) deltaY;
         // 向上移动的最大值就是Header View全部隐藏
         if (mPtrIndicator.willOverTop(to)) {
@@ -348,6 +370,7 @@ public class PtrFrameLayout extends ViewGroup {
         }
 
         mPtrIndicator.setCurrentPos(to);
+
         // 计算移动偏移量
         int posOffset = to - mPtrIndicator.getLastPos();
         updatePos(posOffset);
@@ -412,10 +435,12 @@ public class PtrFrameLayout extends ViewGroup {
                     posOffset, mPtrIndicator.getCurrentPos(), mPtrIndicator.getLastPos(), mContentView.getTop(), mHeaderHeight);
         }
 
+        // TODO: offsetTopAndBottom作用.
         mHeaderView.offsetTopAndBottom(posOffset);
         if (!isPinContent()) {
             mContentView.offsetTopAndBottom(posOffset);
         }
+        // TODO: 针对ViewGroup的invalidate作用.
         invalidate();
 
         if (mPtrUIHandlerHolder.hasHandler()) {
@@ -456,6 +481,10 @@ public class PtrFrameLayout extends ViewGroup {
         dispatchTouchEventSupper(e);
     }
 
+    /**
+     * MOTION_UP, MOTION_DOWN对应的操作.
+     * @param stayForLoading 是否在当前位置进行刷新. false:回弹到指定高度. true:在当前位置刷新.
+     */
     private void onRelease(boolean stayForLoading) {
 
         tryToPerformRefresh();
@@ -479,6 +508,7 @@ public class PtrFrameLayout extends ViewGroup {
             if (mStatus == PTR_STATUS_COMPLETE) {
                 notifyUIRefreshComplete(false);
             } else {
+                // 刚下拉一下未达到刷新距离释放后操作,视为放弃刷新.
                 tryScrollBackToTopAbortRefresh();
             }
         }
@@ -512,23 +542,15 @@ public class PtrFrameLayout extends ViewGroup {
         }
     }
 
-    /**
-     * just make easier to understand
-     */
+
     private void tryScrollBackToTopWhileLoading() {
         tryScrollBackToTop();
     }
 
-    /**
-     * just make easier to understand
-     */
     private void tryScrollBackToTopAfterComplete() {
         tryScrollBackToTop();
     }
 
-    /**
-     * just make easier to understand
-     */
     private void tryScrollBackToTopAbortRefresh() {
         tryScrollBackToTop();
     }
@@ -571,7 +593,8 @@ public class PtrFrameLayout extends ViewGroup {
      * If at the top and not in loading, reset
      */
     private boolean tryToNotifyReset() {
-        if ((mStatus == PTR_STATUS_COMPLETE || mStatus == PTR_STATUS_PREPARE) && mPtrIndicator.isInStartPosition()) {
+        if ((mStatus == PTR_STATUS_COMPLETE || mStatus == PTR_STATUS_PREPARE)
+                && mPtrIndicator.isInStartPosition()) {
             if (mPtrUIHandlerHolder.hasHandler()) {
                 mPtrUIHandlerHolder.onUIReset(this);
                 if (DEBUG) {
@@ -602,15 +625,6 @@ public class PtrFrameLayout extends ViewGroup {
             }
             onRelease(true);
         }
-    }
-
-    /**
-     * Detect whether is refreshing.
-     *
-     * @return
-     */
-    public boolean isRefreshing() {
-        return mStatus == PTR_STATUS_LOADING;
     }
 
     /**
@@ -729,25 +743,11 @@ public class PtrFrameLayout extends ViewGroup {
         return (mFlag & MASK_AUTO_REFRESH) == FLAG_AUTO_REFRESH_BUT_LATER;
     }
 
+    /**
+     * 是否允许刷新完成后立刻再进行刷新.
+     */
     public boolean isEnabledNextPtrAtOnce() {
         return (mFlag & FLAG_ENABLE_NEXT_PTR_AT_ONCE) > 0;
-    }
-
-
-    /**
-     * 在PtrFrameLayout上添加Header View.
-     */
-    public void setHeaderView(View header) {
-        if (mHeaderView != null && header != null && mHeaderView != header) {
-            removeView(mHeaderView);
-        }
-        ViewGroup.LayoutParams lp = header.getLayoutParams();
-        if (lp == null) {
-            lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            header.setLayoutParams(lp);
-        }
-        mHeaderView = header;
-        addView(header);
     }
 
     /**
@@ -785,7 +785,8 @@ public class PtrFrameLayout extends ViewGroup {
 
     /**
      * 设置是否禁止横向移动.
-     * @param disable true:禁止横向移动; false:允许横向移动
+     *
+     * @param disable true:允许横向移动; false:禁止横向移动
      */
     public void disableWhenHorizontalMove(boolean disable) {
         mDisableWhenHorizontalMove = disable;
@@ -823,6 +824,22 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     /**
+     * 在PtrFrameLayout上添加Header View.
+     */
+    public void setHeaderView(View header) {
+        if (mHeaderView != null && header != null && mHeaderView != header) {
+            removeView(mHeaderView);
+        }
+        ViewGroup.LayoutParams lp = header.getLayoutParams();
+        if (lp == null) {
+            lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            header.setLayoutParams(lp);
+        }
+        mHeaderView = header;
+        addView(header);
+    }
+
+    /**
      * 获取下拉刷新的高度.
      */
     public int getOffsetToRefresh() {
@@ -852,6 +869,7 @@ public class PtrFrameLayout extends ViewGroup {
 
     /**
      * 返回刷新方式.
+     *
      * @return true:释放刷新 false:下拉刷新
      */
     public boolean isPullToRefresh() {
@@ -860,6 +878,7 @@ public class PtrFrameLayout extends ViewGroup {
 
     /**
      * 设置是否达到下拉刷新高度立刻刷新
+     *
      * @param pullToRefresh true:下拉直接刷新 false:释放刷新
      */
     public void setPullToRefresh(boolean pullToRefresh) {
@@ -875,6 +894,7 @@ public class PtrFrameLayout extends ViewGroup {
 
     /**
      * 设定下拉刷新时是否显示Header View
+     *
      * @param keepOrNot true:显示; false:不显示.
      */
     public void setKeepHeaderWhenRefresh(boolean keepOrNot) {
@@ -962,7 +982,7 @@ public class PtrFrameLayout extends ViewGroup {
      * 封装Scroller实现回弹效果.
      */
     class ScrollChecker implements Runnable {
-        private int mLastFlingY;
+        private int mLastY;
         private Scroller mScroller;
         private boolean mIsRunning = false;
         private int mStart;
@@ -975,17 +995,17 @@ public class PtrFrameLayout extends ViewGroup {
         public void run() {
             boolean finish = !mScroller.computeScrollOffset() || mScroller.isFinished();
             int curY = mScroller.getCurrY();
-            int deltaY = curY - mLastFlingY;
+            int deltaY = curY - mLastY;
             if (DEBUG) {
                 if (deltaY != 0) {
-                    L.v("scroll: %s, start: %s, to: %s, currentPos: %s, current :%s, last: %s, " +
+                    L.e("scroll: %s, start: %s, to: %s, currentPos: %s, current :%s, last: %s, " +
                                     "delta: %s", finish, mStart, mTo, mPtrIndicator.getCurrentPos(),
-                            curY, mLastFlingY, deltaY);
+                            curY, mLastY, deltaY);
                 }
             }
             if (!finish) {
                 // 如果滑动没有停止
-                mLastFlingY = curY;
+                mLastY = curY;
                 movePos(deltaY);
                 post(this);
             } else {
@@ -1003,10 +1023,13 @@ public class PtrFrameLayout extends ViewGroup {
 
         private void reset() {
             mIsRunning = false;
-            mLastFlingY = 0;
+            mLastY = 0;
             removeCallbacks(this);
         }
 
+        /**
+         * Destory方法:1.重置标志位;2.防止内存泄露.
+         */
         private void destroy() {
             reset();
             if (!mScroller.isFinished()) {
@@ -1021,6 +1044,7 @@ public class PtrFrameLayout extends ViewGroup {
             if (mIsRunning) {
                 L.e("ScrollerChecker abort if working!");
                 if (!mScroller.isFinished()) {
+                    L.e("强制停止！！！！");
                     mScroller.forceFinished(true);
                 }
                 onPtrScrollAbort();
@@ -1042,7 +1066,7 @@ public class PtrFrameLayout extends ViewGroup {
             }
             removeCallbacks(this);
 
-            mLastFlingY = 0;
+            mLastY = 0;
 
             // fix #47: Scroller should be reused, https://github.com/liaohuqiu/android-Ultra-Pull-To-Refresh/issues/47
             if (!mScroller.isFinished()) {

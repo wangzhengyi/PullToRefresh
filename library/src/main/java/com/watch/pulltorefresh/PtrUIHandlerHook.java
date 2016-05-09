@@ -1,7 +1,5 @@
 package com.watch.pulltorefresh;
 
-import java.security.PublicKey;
-
 /**
  * Created by wzy on 16-5-4.
  */
