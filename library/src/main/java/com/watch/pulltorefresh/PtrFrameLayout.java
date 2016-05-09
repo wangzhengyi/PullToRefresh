@@ -179,7 +179,7 @@ public class PtrFrameLayout extends ViewGroup {
                         getMeasuredWidth(), getMeasuredHeight(),
                         lp.leftMargin, lp.topMargin, lp.rightMargin, lp.bottomMargin);
                 L.d("onMeasure, currentPos: %s, lastPos: %s, top: %s",
-                        mPtrIndicator.getCurrentPosY(), mPtrIndicator.getLastPosY(),
+                        mPtrIndicator.getCurrentPos(), mPtrIndicator.getLastPos(),
                         mContentView.getTop());
             }
         }
@@ -191,7 +191,7 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     private void layoutChildren() {
-        int offsetY = mPtrIndicator.getCurrentPosY();
+        int offsetY = mPtrIndicator.getCurrentPos();
         int paddingLeft = getPaddingLeft();
         int paddingTop = getPaddingTop();
 
@@ -239,10 +239,19 @@ public class PtrFrameLayout extends ViewGroup {
 
         int action = e.getAction();
         switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mHasSendCancelEvent = false;
+                mPtrIndicator.onPressDown(e.getX(), e.getY());
+
+                mScrollChecker.abortIfWorking();
+
+                mPreventForHorizontal = false;
+                dispatchTouchEventSupper(e);
+                return true;
+
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 mPtrIndicator.onRelease();
-                // 判断当前Header View是否有偏移
                 if (mPtrIndicator.hasLeftStartPosition()) {
                     if (DEBUG) {
                         L.d("call onRelease when user release");
@@ -256,16 +265,6 @@ public class PtrFrameLayout extends ViewGroup {
                 } else {
                     return dispatchTouchEventSupper(e);
                 }
-
-            case MotionEvent.ACTION_DOWN:
-                mHasSendCancelEvent = false;
-                mPtrIndicator.onPressDown(e.getX(), e.getY());
-
-                mScrollChecker.abortIfWorking();
-
-                mPreventForHorizontal = false;
-                dispatchTouchEventSupper(e);
-                return true;
 
             case MotionEvent.ACTION_MOVE:
                 mLastMoveEvent = e;
@@ -314,16 +313,16 @@ public class PtrFrameLayout extends ViewGroup {
             return;
         }
 
-        int to = mPtrIndicator.getCurrentPosY() + (int) deltaY;
-
+        int to = mPtrIndicator.getCurrentPos() + (int) deltaY;
         // 向上移动的最大值就是Header View全部隐藏
         if (mPtrIndicator.willOverTop(to)) {
-            L.e(String.format("over top"));
+            L.e("over top");
             to = PtrIndicator.POS_START;
         }
 
         mPtrIndicator.setCurrentPos(to);
-        int change = to - mPtrIndicator.getLastPosY();
+        // 计算移动偏移量
+        int change = to - mPtrIndicator.getLastPos();
         updatePos(change);
     }
 
@@ -334,24 +333,27 @@ public class PtrFrameLayout extends ViewGroup {
 
         boolean isUnderTouch = mPtrIndicator.isUnderTouch();
 
-        // once moved, cancel event will be sent to child
+        // PtrFrameLayout接管MotionEvent后,需要发送CANCEL事件给子控件
         if (isUnderTouch && !mHasSendCancelEvent && mPtrIndicator.hasMovedAfterPressedDown()) {
             mHasSendCancelEvent = true;
             sendCancelEvent();
         }
 
-        // leave initiated position or just refresh complete
-        if ((mPtrIndicator.hasJustLeftStartPosition() && mStatus == PTR_STATUS_INIT) ||
-                (mPtrIndicator.goDownCrossFinishPosition() && mStatus == PTR_STATUS_COMPLETE && isEnabledNextPtrAtOnce())) {
 
+        if ((mPtrIndicator.hasJustLeftStartPosition() && mStatus == PTR_STATUS_INIT) ||
+                (mPtrIndicator.goDownCrossFinishPosition()
+                        && mStatus == PTR_STATUS_COMPLETE
+                        && isEnabledNextPtrAtOnce())) {
+            // 设置刷新状态为准备刷新状态
             mStatus = PTR_STATUS_PREPARE;
+            // 将Header View的UI设置为准备刷新的UI.
             mPtrUIHandlerHolder.onUIRefreshPrepare(this);
             if (DEBUG) {
-                L.i("PtrUIHandler: onUIRefreshPrepare, mFlag %s", mFlag);
+                L.i("PtrUIHandler: onUIRefreshPrepare, 准备刷新, mFlag %s", mFlag);
             }
         }
 
-        // back to initiated position
+        // 用户手动回到PtrFrameLayout的初始状态
         if (mPtrIndicator.hasJustBackToStartPosition()) {
             tryToNotifyReset();
 
@@ -363,20 +365,24 @@ public class PtrFrameLayout extends ViewGroup {
 
         // Pull to Refresh
         if (mStatus == PTR_STATUS_PREPARE) {
-            // reach fresh height while moving from top to bottom
+            // 如果达到刷新高度且mPullToRefresh=true,则立刻刷新
             if (isUnderTouch && !isAutoRefresh() && mPullToRefresh
                     && mPtrIndicator.crossRefreshLineFromTopToBottom()) {
+                L.e("开始刷新1");
                 tryToPerformRefresh();
             }
+
             // reach header height while auto refresh
-            if (performAutoRefreshButLater() && mPtrIndicator.hasJustReachedHeaderHeightFromTopToBottom()) {
+            if (performAutoRefreshButLater()
+                    && mPtrIndicator.hasJustReachedHeaderHeightFromTopToBottom()) {
+                L.e("开始刷新2");
                 tryToPerformRefresh();
             }
         }
 
         if (DEBUG) {
             L.v("updatePos: change: %s, current: %s last: %s, top: %s, headerHeight: %s",
-                    change, mPtrIndicator.getCurrentPosY(), mPtrIndicator.getLastPosY(), mContentView.getTop(), mHeaderHeight);
+                    change, mPtrIndicator.getCurrentPos(), mPtrIndicator.getLastPos(), mContentView.getTop(), mHeaderHeight);
         }
 
         mHeaderView.offsetTopAndBottom(change);
@@ -388,10 +394,6 @@ public class PtrFrameLayout extends ViewGroup {
         if (mPtrUIHandlerHolder.hasHandler()) {
             mPtrUIHandlerHolder.onUIPositionChange(this, isUnderTouch, mStatus, mPtrIndicator);
         }
-        onPositionChange(isUnderTouch, mStatus, mPtrIndicator);
-    }
-
-    protected void onPositionChange(boolean isInTouching, byte status, PtrIndicator mPtrIndicator) {
     }
 
     @SuppressWarnings("unused")
@@ -408,9 +410,12 @@ public class PtrFrameLayout extends ViewGroup {
             if (mKeepHeaderWhenRefresh) {
                 // scroll header back
                 if (mPtrIndicator.isOverOffsetToKeepHeaderWhileLoading() && !stayForLoading) {
-                    mScrollChecker.tryToScrollTo(mPtrIndicator.getOffsetToKeepHeaderWhileLoading(), mDurationToClose);
+                    L.e("tryToScrollTo operation!");
+                    mScrollChecker.tryToScrollTo(mPtrIndicator.getOffsetToKeepHeaderWhileLoading(),
+                            mDurationToClose);
                 } else {
                     // do nothing
+                    L.e("onRelease do nothing!");
                 }
             } else {
                 tryScrollBackToTopWhileLoading();
@@ -473,18 +478,27 @@ public class PtrFrameLayout extends ViewGroup {
         tryScrollBackToTop();
     }
 
-    private boolean tryToPerformRefresh() {
+    /**
+     * 准备开始刷新操作
+     */
+    private void tryToPerformRefresh() {
         if (mStatus != PTR_STATUS_PREPARE) {
-            return false;
+            // 开始刷新操作前,刷新状态必须为PTR_STATUS_PREPARE
+            return;
         }
 
-        if ((mPtrIndicator.isOverOffsetToKeepHeaderWhileLoading() && isAutoRefresh()) || mPtrIndicator.isOverOffsetToRefresh()) {
+        if ((mPtrIndicator.isOverOffsetToKeepHeaderWhileLoading() && isAutoRefresh())
+                || mPtrIndicator.isOverOffsetToRefresh()) {
+            // 设置刷新状态为PTR_STATUS_LOADING
             mStatus = PTR_STATUS_LOADING;
+            // 执行刷新操作
             performRefresh();
         }
-        return false;
     }
 
+    /**
+     * 执行刷新操作
+     */
     private void performRefresh() {
         mLoadingStartTime = System.currentTimeMillis();
         if (mPtrUIHandlerHolder.hasHandler()) {
@@ -518,6 +532,7 @@ public class PtrFrameLayout extends ViewGroup {
 
     protected void onPtrScrollAbort() {
         if (mPtrIndicator.hasLeftStartPosition() && isAutoRefresh()) {
+            // 目前刷新头部有偏移且处于自动刷新状态
             if (DEBUG) {
                 L.d("call onRelease after scroll abort");
             }
@@ -909,8 +924,10 @@ public class PtrFrameLayout extends ViewGroup {
         }
     }
 
+    /**
+     * 封装Scroller实现回弹效果.
+     */
     class ScrollChecker implements Runnable {
-
         private int mLastFlingY;
         private Scroller mScroller;
         private boolean mIsRunning = false;
@@ -927,12 +944,13 @@ public class PtrFrameLayout extends ViewGroup {
             int deltaY = curY - mLastFlingY;
             if (DEBUG) {
                 if (deltaY != 0) {
-                    L.v(
-                            "scroll: %s, start: %s, to: %s, currentPos: %s, current :%s, last: %s, delta: %s",
-                            finish, mStart, mTo, mPtrIndicator.getCurrentPosY(), curY, mLastFlingY, deltaY);
+                    L.v("scroll: %s, start: %s, to: %s, currentPos: %s, current :%s, last: %s, " +
+                                    "delta: %s", finish, mStart, mTo, mPtrIndicator.getCurrentPos(),
+                            curY, mLastFlingY, deltaY);
                 }
             }
             if (!finish) {
+                // 如果滑动没有停止
                 mLastFlingY = curY;
                 movePos(deltaY);
                 post(this);
@@ -943,7 +961,7 @@ public class PtrFrameLayout extends ViewGroup {
 
         private void finish() {
             if (DEBUG) {
-                L.v("finish, currentPos:%s", mPtrIndicator.getCurrentPosY());
+                L.v("finish, currentPos:%s", mPtrIndicator.getCurrentPos());
             }
             reset();
             onPtrScrollFinish();
@@ -962,13 +980,19 @@ public class PtrFrameLayout extends ViewGroup {
             }
         }
 
+        /**
+         * 阻止滑动回弹,重置滑动标志位.
+         */
         public void abortIfWorking() {
             if (mIsRunning) {
+                L.e("ScrollerChecker abort if working!");
                 if (!mScroller.isFinished()) {
                     mScroller.forceFinished(true);
                 }
                 onPtrScrollAbort();
                 reset();
+            } else {
+                L.e("ScrollerChecker is not working!");
             }
         }
 
@@ -976,7 +1000,7 @@ public class PtrFrameLayout extends ViewGroup {
             if (mPtrIndicator.isAlreadyHere(to)) {
                 return;
             }
-            mStart = mPtrIndicator.getCurrentPosY();
+            mStart = mPtrIndicator.getCurrentPos();
             mTo = to;
             int distance = to - mStart;
             if (DEBUG) {

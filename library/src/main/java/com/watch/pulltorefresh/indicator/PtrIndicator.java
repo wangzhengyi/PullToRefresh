@@ -2,6 +2,8 @@ package com.watch.pulltorefresh.indicator;
 
 import android.graphics.PointF;
 
+import com.watch.pulltorefresh.util.L;
+
 public class PtrIndicator {
     public final static int POS_START = 0;
     /**
@@ -42,6 +44,9 @@ public class PtrIndicator {
         mResistance = resistance;
     }
 
+    /**
+     * 判断当前是否处于按下状态
+     */
     public boolean isUnderTouch() {
         return mIsUnderTouch;
     }
@@ -124,22 +129,17 @@ public class PtrIndicator {
         return mOffsetY;
     }
 
-    public int getLastPosY() {
+    public int getLastPos() {
         return mLastPos;
     }
 
-    public int getCurrentPosY() {
+    public int getCurrentPos() {
         return mCurrentPos;
     }
 
     public final void setCurrentPos(int current) {
         mLastPos = mCurrentPos;
         mCurrentPos = current;
-        onUpdatePos(current, mLastPos);
-    }
-
-    protected void onUpdatePos(int current, int last) {
-
     }
 
     /**
@@ -189,6 +189,7 @@ public class PtrIndicator {
     }
 
     public boolean isOverOffsetToRefresh() {
+        L.e("PtrIndicator isOverOffsetToRefresh!");
         return mCurrentPos >= getOffsetToRefresh();
     }
 
