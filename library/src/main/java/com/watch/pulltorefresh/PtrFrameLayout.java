@@ -71,6 +71,10 @@ public class PtrFrameLayout extends ViewGroup {
     private long mLoadingStartTime = 0;
     private PtrIndicator mPtrIndicator;
     private boolean mHasSendCancelEvent = false;
+
+    /**
+     * 数据加载时间小于500ms,进行延迟加载
+     */
     private Runnable mPerformRefreshCompleteDelay = new Runnable() {
         @Override
         public void run() {
@@ -559,8 +563,7 @@ public class PtrFrameLayout extends ViewGroup {
     }
 
     /**
-     * Call this when data is loaded.
-     * The UI will perform complete at once or after a delay, depends on the time elapsed is greater then {@link #mLoadingMinTime} or not.
+     * 用户加载数据结束后需要回调PtrFrameLayout的refreshComplete方法.
      */
     final public void refreshComplete() {
         if (DEBUG) {
