@@ -12,7 +12,7 @@ import android.widget.Scroller;
 import com.watch.pulltorefresh.indicator.PtrIndicator;
 import com.watch.pulltorefresh.util.L;
 
-
+@SuppressWarnings("unused")
 public class PtrFrameLayout extends ViewGroup {
 
     // status enum
@@ -20,7 +20,7 @@ public class PtrFrameLayout extends ViewGroup {
     public final static byte PTR_STATUS_PREPARE = 2;
     public final static byte PTR_STATUS_LOADING = 3;
     public final static byte PTR_STATUS_COMPLETE = 4;
-    public static boolean DEBUG = true;
+    public static boolean DEBUG = false;
     // auto refresh status
     private static byte FLAG_AUTO_REFRESH_AT_ONCE = 0x01;
     private static byte FLAG_AUTO_REFRESH_BUT_LATER = 0x01 << 1;
@@ -42,7 +42,7 @@ public class PtrFrameLayout extends ViewGroup {
     /**
      * 刷新完成后,Header View的回弹时间.
      */
-    private int mDurationToCloseHeader = 10000;
+    private int mDurationToCloseHeader = 1000;
 
     /**
      * 下拉刷新是否保持Header View的显示.
@@ -827,9 +827,14 @@ public class PtrFrameLayout extends ViewGroup {
      * 在PtrFrameLayout上添加Header View.
      */
     public void setHeaderView(View header) {
-        if (mHeaderView != null && header != null && mHeaderView != header) {
+        if (header == null) {
+            return;
+        }
+
+        if (mHeaderView != null && mHeaderView != header) {
             removeView(mHeaderView);
         }
+
         ViewGroup.LayoutParams lp = header.getLayoutParams();
         if (lp == null) {
             lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);

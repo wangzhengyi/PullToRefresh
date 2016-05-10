@@ -1,120 +1,75 @@
 package com.watch.pulltorefresh;
 
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.content.res.TypedArray;
-import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.watch.pulltorefresh.indicator.PtrIndicator;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import com.watch.pulltorefresh.R;
-
 public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler {
-
-    private final static String KEY_SharedPreferences = "cube_ptr_classic_last_update";
-    private static SimpleDateFormat sDataFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private int mRotateAniTime = 150;
+    private static final int ROTATE_ANIMATION_TIME = 150;
     private RotateAnimation mFlipAnimation;
     private RotateAnimation mReverseFlipAnimation;
-    private TextView mTitleTextView;
-    private View mRotateView;
-    private View mProgressBar;
-    private long mLastUpdateTime = -1;
-    private TextView mLastUpdateTextView;
-    private String mLastUpdateTimeKey;
-    private boolean mShouldShowLastUpdate;
 
-    private LastUpdateTimeUpdater mLastUpdateTimeUpdater = new LastUpdateTimeUpdater();
+    /**
+     * 显示刷新提示的TextView.
+     */
+    private TextView mTitleTextView;
+
+    /**
+     * 箭头图标.
+     */
+    private ImageView mRotateImageView;
+
+    /**
+     * 进度圆环.
+     */
+    private View mProgressBar;
 
     public PtrClassicDefaultHeader(Context context) {
-        super(context);
-        initViews(null);
+        this(context, null);
     }
 
     public PtrClassicDefaultHeader(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        initViews(attrs);
+        this(context, attrs, 0);
     }
 
     public PtrClassicDefaultHeader(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        initViews(attrs);
-    }
 
-    protected void initViews(AttributeSet attrs) {
-        TypedArray arr = getContext().obtainStyledAttributes(attrs, R.styleable.PtrClassicHeader, 0, 0);
-        if (arr != null) {
-            mRotateAniTime = arr.getInt(R.styleable.PtrClassicHeader_ptr_rotate_ani_time, mRotateAniTime);
-        }
         buildAnimation();
-        View header = LayoutInflater.from(getContext()).inflate(R.layout.cube_ptr_classic_default_header, this);
-
-        mRotateView = header.findViewById(R.id.ptr_classic_header_rotate_view);
-
-        mTitleTextView = (TextView) header.findViewById(R.id.ptr_classic_header_rotate_view_header_title);
-        mLastUpdateTextView = (TextView) header.findViewById(R.id.ptr_classic_header_rotate_view_header_last_update);
-        mProgressBar = header.findViewById(R.id.ptr_classic_header_rotate_view_progressbar);
-
-        resetView();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        if (mLastUpdateTimeUpdater != null) {
-            mLastUpdateTimeUpdater.stop();
-        }
-    }
-
-    public void setRotateAniTime(int time) {
-        if (time == mRotateAniTime || time == 0) {
-            return;
-        }
-        mRotateAniTime = time;
-        buildAnimation();
-    }
-
-    /**
-     * Specify the last update time by this key string
-     *
-     * @param key
-     */
-    public void setLastUpdateTimeKey(String key) {
-        if (TextUtils.isEmpty(key)) {
-            return;
-        }
-        mLastUpdateTimeKey = key;
-    }
-
-    /**
-     * Using an object to specify the last update time.
-     *
-     * @param object
-     */
-    public void setLastUpdateTimeRelateObject(Object object) {
-        setLastUpdateTimeKey(object.getClass().getName());
+        initViews();
     }
 
     private void buildAnimation() {
-        mFlipAnimation = new RotateAnimation(0, -180, RotateAnimation.RELATIVE_TO_SELF, 0.5f, RotateAnimation.RELATIVE_TO_SELF, 0.5f);
+        mFlipAnimation = new RotateAnimation(0, -180, RotateAnimation.RELATIVE_TO_SELF, 0.5f,
+                RotateAnimation.RELATIVE_TO_SELF, 0.5f);
         mFlipAnimation.setInterpolator(new LinearInterpolator());
-        mFlipAnimation.setDuration(mRotateAniTime);
+        mFlipAnimation.setDuration(ROTATE_ANIMATION_TIME);
         mFlipAnimation.setFillAfter(true);
 
-        mReverseFlipAnimation = new RotateAnimation(-180, 0, RotateAnimation.RELATIVE_TO_SELF, 0.5f, RotateAnimation.RELATIVE_TO_SELF, 0.5f);
+        mReverseFlipAnimation = new RotateAnimation(-180, 0, RotateAnimation.RELATIVE_TO_SELF, 0.5f,
+                RotateAnimation.RELATIVE_TO_SELF, 0.5f);
         mReverseFlipAnimation.setInterpolator(new LinearInterpolator());
-        mReverseFlipAnimation.setDuration(mRotateAniTime);
+        mReverseFlipAnimation.setDuration(ROTATE_ANIMATION_TIME);
         mReverseFlipAnimation.setFillAfter(true);
+    }
+
+    protected void initViews() {
+        View header = LayoutInflater.from(getContext()).inflate(R.layout.ptr_classic_default_header, this);
+
+        mRotateImageView = (ImageView) header.findViewById(R.id.ptr_classic_header_rotate_view);
+        mTitleTextView = (TextView) header.
+                findViewById(R.id.ptr_classic_header_rotate_view_header_title);
+        mProgressBar = header.findViewById(R.id.ptr_classic_header_rotate_view_progressbar);
+
+        resetView();
     }
 
     private void resetView() {
@@ -123,182 +78,78 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
     }
 
     private void hideRotateView() {
-        mRotateView.clearAnimation();
-        mRotateView.setVisibility(INVISIBLE);
+        mRotateImageView.clearAnimation();
+        mRotateImageView.setVisibility(INVISIBLE);
     }
 
     @Override
     public void onUIReset(PtrFrameLayout frame) {
         resetView();
-        mShouldShowLastUpdate = true;
-        tryUpdateLastUpdateTime();
     }
 
     @Override
     public void onUIRefreshPrepare(PtrFrameLayout frame) {
-
-        mShouldShowLastUpdate = true;
-        tryUpdateLastUpdateTime();
-        mLastUpdateTimeUpdater.start();
-
         mProgressBar.setVisibility(INVISIBLE);
-
-        mRotateView.setVisibility(VISIBLE);
+        mRotateImageView.setVisibility(VISIBLE);
         mTitleTextView.setVisibility(VISIBLE);
-        if (frame.isPullToRefresh()) {
-            mTitleTextView.setText("下拉刷新");
-        } else {
-            mTitleTextView.setText("下拉");
-        }
+
+        mTitleTextView.setText(getResources().getString(R.string.pull_down_refresh_weather));
     }
 
     @Override
     public void onUIRefreshBegin(PtrFrameLayout frame) {
-        mShouldShowLastUpdate = false;
         hideRotateView();
         mProgressBar.setVisibility(VISIBLE);
         mTitleTextView.setVisibility(VISIBLE);
-        mTitleTextView.setText("加载中");
-
-        tryUpdateLastUpdateTime();
-        mLastUpdateTimeUpdater.stop();
+        mTitleTextView.setText(getResources().getString(R.string.ptr_refreshing));
     }
 
     @Override
     public void onUIRefreshComplete(PtrFrameLayout frame) {
-
         hideRotateView();
         mProgressBar.setVisibility(INVISIBLE);
-
-        mTitleTextView.setVisibility(VISIBLE);
-        mTitleTextView.setText("更新完成");
-
-        // update last update time
-        SharedPreferences sharedPreferences = getContext().getSharedPreferences(KEY_SharedPreferences, 0);
-        if (!TextUtils.isEmpty(mLastUpdateTimeKey)) {
-            mLastUpdateTime = new Date().getTime();
-            sharedPreferences.edit().putLong(mLastUpdateTimeKey, mLastUpdateTime).commit();
-        }
-    }
-
-    private void tryUpdateLastUpdateTime() {
-        if (TextUtils.isEmpty(mLastUpdateTimeKey) || !mShouldShowLastUpdate) {
-            mLastUpdateTextView.setVisibility(GONE);
-        } else {
-            String time = getLastUpdateTime();
-            if (TextUtils.isEmpty(time)) {
-                mLastUpdateTextView.setVisibility(GONE);
-            } else {
-                mLastUpdateTextView.setVisibility(VISIBLE);
-                mLastUpdateTextView.setText(time);
-            }
-        }
-    }
-
-    private String getLastUpdateTime() {
-
-        if (mLastUpdateTime == -1 && !TextUtils.isEmpty(mLastUpdateTimeKey)) {
-            mLastUpdateTime = getContext().getSharedPreferences(KEY_SharedPreferences, 0).getLong(mLastUpdateTimeKey, -1);
-        }
-        if (mLastUpdateTime == -1) {
-            return null;
-        }
-        long diffTime = new Date().getTime() - mLastUpdateTime;
-        int seconds = (int) (diffTime / 1000);
-        if (diffTime < 0) {
-            return null;
-        }
-        if (seconds <= 0) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("上次更新:");
-
-        if (seconds < 60) {
-            sb.append(seconds + " 秒之前");
-        } else {
-            int minutes = (seconds / 60);
-            if (minutes > 60) {
-                int hours = minutes / 60;
-                if (hours > 24) {
-                    Date date = new Date(mLastUpdateTime);
-                    sb.append(sDataFormat.format(date));
-                } else {
-                    sb.append(hours + " 小时之前");
-                }
-
-            } else {
-                sb.append(minutes + " 分钟之前");
-            }
-        }
-        return sb.toString();
+        mTitleTextView.setVisibility(INVISIBLE);
     }
 
     @Override
-    public void onUIPositionChange(PtrFrameLayout frame, boolean isUnderTouch, byte status, PtrIndicator ptrIndicator) {
+    public void onUIPositionChange(PtrFrameLayout frame, boolean isUnderTouch, byte status,
+                                   PtrIndicator ptrIndicator) {
 
         final int mOffsetToRefresh = frame.getOffsetToRefresh();
         final int currentPos = ptrIndicator.getCurrentPos();
         final int lastPos = ptrIndicator.getLastPos();
 
         if (currentPos < mOffsetToRefresh && lastPos >= mOffsetToRefresh) {
+            // 从释放刷新->下拉刷新状态
             if (isUnderTouch && status == PtrFrameLayout.PTR_STATUS_PREPARE) {
-                crossRotateLineFromBottomUnderTouch(frame);
-                if (mRotateView != null) {
-                    mRotateView.clearAnimation();
-                    mRotateView.startAnimation(mReverseFlipAnimation);
+                setTitleTextToPullDownRefresh(frame);
+                if (mRotateImageView != null) {
+                    mRotateImageView.clearAnimation();
+                    mRotateImageView.startAnimation(mReverseFlipAnimation);
                 }
             }
         } else if (currentPos > mOffsetToRefresh && lastPos <= mOffsetToRefresh) {
+            // 从下拉刷新->释放刷新状态
             if (isUnderTouch && status == PtrFrameLayout.PTR_STATUS_PREPARE) {
-                crossRotateLineFromTopUnderTouch(frame);
-                if (mRotateView != null) {
-                    mRotateView.clearAnimation();
-                    mRotateView.startAnimation(mFlipAnimation);
+                setTitleTextReleaseRefresh(frame);
+                if (mRotateImageView != null) {
+                    mRotateImageView.clearAnimation();
+                    mRotateImageView.startAnimation(mFlipAnimation);
                 }
             }
         }
     }
 
-    private void crossRotateLineFromTopUnderTouch(PtrFrameLayout frame) {
+    private void setTitleTextReleaseRefresh(PtrFrameLayout frame) {
         if (!frame.isPullToRefresh()) {
             mTitleTextView.setVisibility(VISIBLE);
-            mTitleTextView.setText("释放刷新");
+            mTitleTextView.setText(getResources().getString(R.string.release_refresh_weather));
         }
     }
 
-    private void crossRotateLineFromBottomUnderTouch(PtrFrameLayout frame) {
+    @SuppressWarnings("UnusedParameters")
+    private void setTitleTextToPullDownRefresh(PtrFrameLayout frame) {
         mTitleTextView.setVisibility(VISIBLE);
-        if (frame.isPullToRefresh()) {
-            mTitleTextView.setText("下拉刷新");
-        } else {
-            mTitleTextView.setText("下拉");
-        }
-    }
-
-    private class LastUpdateTimeUpdater implements Runnable {
-
-        private boolean mRunning = false;
-
-        private void start() {
-            if (TextUtils.isEmpty(mLastUpdateTimeKey)) {
-                return;
-            }
-            mRunning = true;
-            run();
-        }
-
-        private void stop() {
-            mRunning = false;
-            removeCallbacks(this);
-        }
-
-        @Override
-        public void run() {
-            tryUpdateLastUpdateTime();
-            if (mRunning) {
-                postDelayed(this, 1000);
-            }
-        }
+        mTitleTextView.setText(getResources().getString(R.string.pull_down_refresh_weather));
     }
 }

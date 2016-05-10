@@ -8,13 +8,11 @@ public class PtrClassicFrameLayout extends PtrFrameLayout {
     private PtrClassicDefaultHeader mPtrClassicHeader;
 
     public PtrClassicFrameLayout(Context context) {
-        super(context);
-        initViews();
+        this(context, null);
     }
 
     public PtrClassicFrameLayout(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        initViews();
+        this(context, attrs, 0);
     }
 
     public PtrClassicFrameLayout(Context context, AttributeSet attrs, int defStyle) {
@@ -28,29 +26,8 @@ public class PtrClassicFrameLayout extends PtrFrameLayout {
         addPtrUIHandler(mPtrClassicHeader);
     }
 
+    @SuppressWarnings("unused")
     public PtrClassicDefaultHeader getHeader() {
         return mPtrClassicHeader;
-    }
-
-    /**
-     * Specify the last update time by this key string
-     *
-     * @param key
-     */
-    public void setLastUpdateTimeKey(String key) {
-        if (mPtrClassicHeader != null) {
-            mPtrClassicHeader.setLastUpdateTimeKey(key);
-        }
-    }
-
-    /**
-     * Using an object to specify the last update time.
-     *
-     * @param object
-     */
-    public void setLastUpdateTimeRelateObject(Object object) {
-        if (mPtrClassicHeader != null) {
-            mPtrClassicHeader.setLastUpdateTimeRelateObject(object);
-        }
     }
 }
