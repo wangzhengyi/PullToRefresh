@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <declare-styleable name="PtrClassicHeader">
-        <attr name="ptr_rotate_ani_time" format="integer" />
-    </declare-styleable>
-</resources>
