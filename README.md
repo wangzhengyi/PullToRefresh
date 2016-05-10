@@ -6,6 +6,12 @@
 1. 更精简的代码实现.
 2. 更丰富的代码注释.
 
+使用示例：
+
+<div class='row'>
+    <img src="https://github.com/wangzhengyi/PullToRefresh/raw/master/pic/pull-to-refresh.gif" width="300px"/>
+</div>
+
 # 集成方式
 
 采用library project方式集成.
@@ -33,7 +39,7 @@ LOCAL_AAPT_FLAGS := --extra-packages com.watch.pulltorefresh
 
 ## 自定义参数
 
-* resistance: 阻尼系数,用于人为增加下拉距离,增强下拉体验.计算公式：offsetY = realOffsetY / resistance.
+* resistance: 阻尼系数,用于人为增加下拉距离,增强下拉体验.计算公式: offsetY = realOffsetY / resistance.
 * ratio_of_header_height_to_refresh: 触发刷新时的高度比例(与Header View的高度比例).
 * duration_to_close: 回弹到刷新点的时间.
 * duration_to_close_header: 头部回弹时间.
@@ -109,3 +115,5 @@ private void initView() {
     mTextView = (TextView) findViewById(R.id.id_content);
 }
 ```
+
+# [项目分析](https://github.com/wangzhengyi/PullToRefresh/blob/master/analysis_pulltorefresh.md)
