@@ -12,7 +12,6 @@ import android.widget.Scroller;
 import com.watch.pulltorefresh.indicator.PtrIndicator;
 import com.watch.pulltorefresh.util.L;
 
-@SuppressWarnings("unused")
 public class PtrFrameLayout extends ViewGroup {
 
     // status enum
@@ -83,8 +82,6 @@ public class PtrFrameLayout extends ViewGroup {
      * 记录之前一个MotionEvent事件.
      */
     private MotionEvent mLastMoveEvent;
-
-    private PtrUIHandlerHook mRefreshCompleteHook;
 
     private int mLoadingMinTime = 500;
     private long mLoadingStartTime = 0;
@@ -506,31 +503,12 @@ public class PtrFrameLayout extends ViewGroup {
             }
         } else {
             if (mStatus == PTR_STATUS_COMPLETE) {
-                notifyUIRefreshComplete(false);
+                notifyUIRefreshComplete();
             } else {
                 // 刚下拉一下未达到刷新距离释放后操作,视为放弃刷新.
                 tryScrollBackToTopAbortRefresh();
             }
         }
-    }
-
-    /**
-     * please DO REMEMBER resume the hook
-     *
-     * @param hook
-     */
-
-    public void setRefreshCompleteHook(PtrUIHandlerHook hook) {
-        mRefreshCompleteHook = hook;
-        hook.setResumeAction(new Runnable() {
-            @Override
-            public void run() {
-                if (DEBUG) {
-                    L.d("mRefreshCompleteHook resume.");
-                }
-                notifyUIRefreshComplete(true);
-            }
-        });
     }
 
     /**
@@ -635,10 +613,6 @@ public class PtrFrameLayout extends ViewGroup {
             L.i("refreshComplete");
         }
 
-        if (mRefreshCompleteHook != null) {
-            mRefreshCompleteHook.reset();
-        }
-
         int delay = (int) (mLoadingMinTime - (System.currentTimeMillis() - mLoadingStartTime));
         if (delay <= 0) {
             if (DEBUG) {
@@ -669,26 +643,13 @@ public class PtrFrameLayout extends ViewGroup {
             return;
         }
 
-        notifyUIRefreshComplete(false);
+        notifyUIRefreshComplete();
     }
 
     /**
      * Do real refresh work. If there is a hook, execute the hook first.
-     *
-     * @param ignoreHook
      */
-    private void notifyUIRefreshComplete(boolean ignoreHook) {
-        /**
-         * After hook operation is done, {@link #notifyUIRefreshComplete} will be call in resume action to ignore hook.
-         */
-        if (mPtrIndicator.hasLeftStartPosition() && !ignoreHook && mRefreshCompleteHook != null) {
-            if (DEBUG) {
-                L.d("notifyUIRefreshComplete mRefreshCompleteHook run.");
-            }
-
-            mRefreshCompleteHook.takeOver();
-            return;
-        }
+    private void notifyUIRefreshComplete() {
         if (mPtrUIHandlerHolder.hasHandler()) {
             if (DEBUG) {
                 L.i("PtrUIHandler: onUIRefreshComplete");
