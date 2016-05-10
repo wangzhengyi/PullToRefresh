@@ -62,7 +62,8 @@ public class PtrClassicDefaultHeader extends FrameLayout implements PtrUIHandler
     }
 
     protected void initViews() {
-        View header = LayoutInflater.from(getContext()).inflate(R.layout.ptr_classic_default_header, this);
+        View header = LayoutInflater.from(getContext()).
+                inflate(R.layout.ptr_classic_default_header, this);
 
         mRotateImageView = (ImageView) header.findViewById(R.id.ptr_classic_header_rotate_view);
         mTitleTextView = (TextView) header.
