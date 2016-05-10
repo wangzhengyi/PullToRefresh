@@ -4,27 +4,25 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
-import android.view.View;
 import android.widget.TextView;
 
 import com.watch.pulltorefresh.PtrDefaultHandler;
 import com.watch.pulltorefresh.PtrFrameLayout;
-import com.watch.pulltorefresh.PtrHandler;
 
 public class MainActivity extends AppCompatActivity {
     private TextView mTextView;
 
     private int index;
-private Handler mHandler = new Handler() {
-    @Override
-    public void handleMessage(Message msg) {
-        PtrFrameLayout frameLayout = (PtrFrameLayout) msg.obj;
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            PtrFrameLayout frameLayout = (PtrFrameLayout) msg.obj;
 
-        mTextView.setText("content num=" + (++ index));
+            mTextView.setText("content num=" + (++index));
 
-        frameLayout.refreshComplete();
-    }
-};
+            frameLayout.refreshComplete();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
