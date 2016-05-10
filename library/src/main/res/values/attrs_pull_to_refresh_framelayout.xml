@@ -9,9 +9,9 @@
         <attr name="duration_to_close" format="integer" />
         <!-- 头部回弹时间 -->
         <attr name="duration_to_close_header" format="integer" />
-        <!-- 刷新是否保持头部 -->
+        <!-- 下拉直接刷新or释放刷新 -->
         <attr name="pull_to_fresh" format="boolean" />
-        <!-- 是否为释放刷新 -->
+        <!-- 刷新过程中是否保持头部显示 -->
         <attr name="keep_header_when_refresh" format="boolean" />
     </declare-styleable>
 
